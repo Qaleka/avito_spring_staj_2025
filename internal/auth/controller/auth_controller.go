@@ -27,12 +27,6 @@ func (h *AuthHandler) DummyLogin(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	defer cancel()
 
-	authHeader := r.Header.Get("authorization")
-	if authHeader != "" {
-		h.handleError(w, errors.New("authorization already exists"), requestID)
-		return
-	}
-
 	var role requests.DummyLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&role); err != nil {
 		h.handleError(w, err, requestID)
@@ -146,11 +140,11 @@ func (h *AuthHandler) handleError(w http.ResponseWriter, err error, requestID st
 	errorResponse := map[string]string{"errors": err.Error()}
 
 	switch err.Error() {
-	case "not correct username", "not correct password",
-		"jwt_token already exists", "Input contains invalid characters",
+	case "invalid role", "invalid credentials",
+		"user with this email already exists", "user not found",
 		"Input exceeds character limit":
 		w.WriteHeader(http.StatusBadRequest)
-	case "invalid credentials":
+	case "invalid password":
 		w.WriteHeader(http.StatusUnauthorized)
 	case "failed to generate error response":
 		w.WriteHeader(http.StatusInternalServerError)

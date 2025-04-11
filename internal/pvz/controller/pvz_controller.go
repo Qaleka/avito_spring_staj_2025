@@ -220,12 +220,12 @@ func (h *PvzHandler) handleError(w http.ResponseWriter, err error, requestID str
 	errorResponse := map[string]string{"errors": err.Error()}
 
 	switch err.Error() {
-	case "not correct username", "not correct password",
-		"jwt_token already exists", "Input contains invalid characters",
-		"Input exceeds character limit":
+	case "this city is not allowed", "active reception already exists",
+		"this type is not allowed", "pvz not found",
+		"no active reception", "invalid startDate", "invalid endDate", "no products in reception":
 		w.WriteHeader(http.StatusBadRequest)
-	case "invalid credentials":
-		w.WriteHeader(http.StatusUnauthorized)
+	case "this role is not allowed":
+		w.WriteHeader(http.StatusForbidden)
 	case "failed to generate error response":
 		w.WriteHeader(http.StatusInternalServerError)
 	default:
