@@ -10,7 +10,6 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"go.uber.org/zap"
 	"net/http"
-	"time"
 )
 
 type AuthHandler struct {
@@ -24,16 +23,9 @@ func NewAuthHandler(usecase usecase.AuthUsecase) *AuthHandler {
 }
 
 func (h *AuthHandler) DummyLogin(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	defer cancel()
-
-	logger.AccessLogger.Info("Received DummyLogin request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()),
-	)
 
 	authHeader := r.Header.Get("authorization")
 	if authHeader != "" {
@@ -60,29 +52,17 @@ func (h *AuthHandler) DummyLogin(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(token); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	err = json.NewEncoder(w).Encode(token)
+	if err != nil {
+		h.handleError(w, err, requestID)
 		return
 	}
-
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed DummyLogin request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusOK),
-	)
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	defer cancel()
-	logger.AccessLogger.Info("Received DummyLogin request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()),
-	)
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
@@ -108,30 +88,20 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed Register request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusCreated))
-
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	defer cancel()
-
-	logger.AccessLogger.Info("Received Login request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()))
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
@@ -156,18 +126,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(token); err != nil {
+	err = json.NewEncoder(w).Encode(token)
+	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed Register request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusOK))
-
 }
 
 func (h *AuthHandler) handleError(w http.ResponseWriter, err error, requestID string) {

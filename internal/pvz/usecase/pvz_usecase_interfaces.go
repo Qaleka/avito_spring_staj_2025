@@ -4,6 +4,7 @@ import (
 	"avito_spring_staj_2025/domain/requests"
 	"avito_spring_staj_2025/domain/responses"
 	"context"
+	"time"
 )
 
 type PvzUsecase interface {
@@ -12,4 +13,5 @@ type PvzUsecase interface {
 	AddProductToReception(ctx context.Context, data requests.AddProductRequest) (responses.AddProductResponse, error)
 	DeleteLastProduct(ctx context.Context, pvdId string) error
 	CloseReception(ctx context.Context, pvdId string) (responses.CloseReceptionResponse, error)
+	GetPvzsInformation(ctx context.Context, fromDate, toDate time.Time, limit, page int) ([]responses.GetPvzsInformationResponse, error)
 }

@@ -8,6 +8,7 @@ import (
 	"avito_spring_staj_2025/internal/service/middleware"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"time"
 )
@@ -41,7 +42,15 @@ func (pu *pvzUsecase) CreateReception(ctx context.Context, data requests.CreateR
 		return responses.CreateReceptionResponse{}, errors.New("this role is not allowed")
 	}
 
-	_, err := pu.pvzRepository.GetPvzById(ctx, data.Id)
+	_, err := pu.pvzRepository.GetCurrentReception(ctx, data.PvzId)
+	if err != nil && err.Error() != "no active reception" {
+		return responses.CreateReceptionResponse{}, err
+	}
+	if err == nil {
+		return responses.CreateReceptionResponse{}, errors.New("active reception already exists")
+	}
+
+	_, err = pu.pvzRepository.GetPvzById(ctx, data.PvzId)
 	if err != nil {
 		return responses.CreateReceptionResponse{}, err
 	}
@@ -49,7 +58,7 @@ func (pu *pvzUsecase) CreateReception(ctx context.Context, data requests.CreateR
 	reception := models.Reception{
 		Id:       uuid.New().String(),
 		DateTime: time.Now(),
-		PvzId:    data.Id,
+		PvzId:    data.PvzId,
 		Status:   "in_progress",
 	}
 
@@ -155,4 +164,39 @@ func (pu *pvzUsecase) CloseReception(ctx context.Context, pvzId string) (respons
 		PvzId:    reception.PvzId,
 		Status:   reception.Status,
 	}, nil
+}
+
+func (pu *pvzUsecase) GetPvzsInformation(ctx context.Context, fromDate, toDate time.Time, limit, page int) ([]responses.GetPvzsInformationResponse, error) {
+	offset := (page - 1) * limit
+	pvzs, err := pu.pvzRepository.GetPvzsFilteredByReceptionDate(ctx, fromDate, toDate, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(pvzs)
+	var response []responses.GetPvzsInformationResponse
+	for _, pvz := range pvzs {
+		receptions, err := pu.pvzRepository.GetPvzReceptions(ctx, pvz.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		var receptionsWithProducts []responses.GetReceptionWithProducts
+		for _, reception := range receptions {
+			products, err := pu.pvzRepository.GetReceptionProducts(ctx, reception.Id)
+			if err != nil {
+				return nil, err
+			}
+			receptionsWithProducts = append(receptionsWithProducts, responses.GetReceptionWithProducts{
+				Reception: reception,
+				Products:  products,
+			})
+		}
+
+		response = append(response, responses.GetPvzsInformationResponse{
+			Pvz:        pvz,
+			Receptions: receptionsWithProducts,
+		})
+	}
+
+	return response, nil
 }

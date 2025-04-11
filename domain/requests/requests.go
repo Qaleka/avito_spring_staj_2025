@@ -24,10 +24,24 @@ type CreatePvzRequest struct {
 }
 
 type CreateReceptionRequest struct {
-	Id string `json:"id"`
+	PvzId string `json:"pvzId"`
+}
+
+type GetPvzInfoQueries struct {
+	StartDate time.Time `json:"startDate"`
+	EndDate   time.Time `json:"endDate"`
+	Page      int       `json:"page"`
+	Limit     int       `json:"limit"`
 }
 
 type AddProductRequest struct {
 	Type  string `json:"type"`
 	PvzId string `json:"pvzId"`
+}
+
+type GetPvzListRequest struct {
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+	Limit     int    `json:"limit"`
+	Offset    int    `json:"offset"`
 }

@@ -4,7 +4,7 @@ import "time"
 
 const (
 	STATUS_ACTIVE = "in_progress"
-	STATUS_CLOSED = "closed"
+	STATUS_CLOSED = "close"
 )
 
 type Reception struct {

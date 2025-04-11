@@ -5,8 +5,8 @@ import (
 	"avito_spring_staj_2025/domain/requests"
 	"avito_spring_staj_2025/domain/responses"
 	"avito_spring_staj_2025/internal/auth/repository"
+	"avito_spring_staj_2025/internal/service/auth"
 	"avito_spring_staj_2025/internal/service/jwt"
-	"avito_spring_staj_2025/internal/service/middleware"
 	"context"
 	"errors"
 	"github.com/google/uuid"
@@ -38,7 +38,7 @@ func (au *authUsecase) DummyLogin(ctx context.Context, role string) (string, err
 }
 
 func (au *authUsecase) Register(ctx context.Context, credentials requests.RegisterRequest) (responses.RegisterResponse, error) {
-	hashedPassword, err := middleware.HashPassword(credentials.Password)
+	hashedPassword, err := auth.HashPassword(credentials.Password)
 	if err != nil {
 		return responses.RegisterResponse{}, err
 	}
@@ -65,7 +65,7 @@ func (au *authUsecase) Login(ctx context.Context, credentials requests.LoginRequ
 	if err != nil {
 		return "", err
 	}
-	if ok := middleware.CheckPassword(user.Password, credentials.Password); !ok {
+	if ok := auth.CheckPassword(user.Password, credentials.Password); !ok {
 		return "", errors.New("invalid password")
 	}
 	tokenExpTime := time.Now().Add(24 * time.Hour).Unix()

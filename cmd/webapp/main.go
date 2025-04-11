@@ -4,6 +4,8 @@ import (
 	authController "avito_spring_staj_2025/internal/auth/controller"
 	authRepository "avito_spring_staj_2025/internal/auth/repository"
 	authUsecase "avito_spring_staj_2025/internal/auth/usecase"
+	"avito_spring_staj_2025/internal/service/db"
+	"avito_spring_staj_2025/internal/service/metrics"
 
 	pvzController "avito_spring_staj_2025/internal/pvz/controller"
 	pvzRepository "avito_spring_staj_2025/internal/pvz/repository"
@@ -21,7 +23,7 @@ import (
 
 func main() {
 	_ = godotenv.Load()
-	db := middleware.DbConnect()
+	db := db.DbConnect()
 	jwtToken, err := jwt.NewJwtToken("secret-key")
 	if err != nil {
 		log.Fatalf("Failed to create JWT token: %v", err)
@@ -36,6 +38,8 @@ func main() {
 			log.Fatalf("Failed to sync loggers: %v", err)
 		}
 	}()
+
+	metrics.InitMetrics()
 
 	authRepository := authRepository.NewAuthRepository(db)
 	authUseCase := authUsecase.NewAuthUsecase(authRepository, jwtToken)

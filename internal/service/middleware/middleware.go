@@ -1,16 +1,15 @@
 package middleware
 
 import (
-	"avito_spring_staj_2025/internal/service/dsn"
 	"avito_spring_staj_2025/internal/service/jwt"
+	"avito_spring_staj_2025/internal/service/logger"
+	"avito_spring_staj_2025/internal/service/metrics"
 	"context"
-	"database/sql"
-	"fmt"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -95,35 +94,6 @@ func EnableCORS(next http.Handler) http.Handler {
 	})
 }
 
-func DbConnect() *sql.DB {
-	dsnString := dsn.FromEnv()
-	if dsnString == "" {
-		log.Fatal("DSN not provided. Please check your environment variables.")
-	}
-
-	db, err := sql.Open("postgres", dsnString)
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
-
-	const maxOpenConns = 1000
-	const maxIdleConns = 500
-	const connMaxLifetime = 30 * time.Minute
-	const connMaxIdleTime = 5 * time.Minute
-
-	db.SetMaxOpenConns(maxOpenConns)
-	db.SetMaxIdleConns(maxIdleConns)
-	db.SetConnMaxLifetime(connMaxLifetime)
-	db.SetConnMaxIdleTime(connMaxIdleTime)
-
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-
-	fmt.Println("Connected to database")
-	return db
-}
-
 const (
 	ContextKeyRole contextKey = "role"
 	ContextKeyUser contextKey = "user"
@@ -151,15 +121,47 @@ func RoleMiddleware(jwtService jwt.JwtTokenService) func(http.Handler) http.Hand
 	}
 }
 
-func HashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedPassword), nil
+func WithLoggingAndMetrics(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		requestID := GetRequestID(r.Context())
+		ctx, cancel := WithTimeout(r.Context())
+		defer cancel()
+
+		logger.AccessLogger.Info("Received request",
+			zap.String("request_id", requestID),
+			zap.String("method", r.Method),
+			zap.String("url", r.URL.Path),
+		)
+
+		defer func() {
+			duration := time.Since(start).Seconds()
+			metrics.TotalRequests.WithLabelValues(r.URL.Path).Inc()
+			metrics.AnswerDuration.WithLabelValues(r.URL.Path).Observe(duration)
+
+			logger.AccessLogger.Info("Completed request",
+				zap.String("request_id", requestID),
+				zap.Duration("duration", time.Since(start)),
+				zap.Int("status", http.StatusOK),
+			)
+		}()
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
-func CheckPassword(hashedPassword, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	return err == nil
+func WithCustomMetric(metric *prometheus.CounterVec) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+			metric.WithLabelValues(r.URL.Path).Inc()
+		})
+	}
+}
+
+func ChainMiddlewares(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
+	for _, m := range middlewares {
+		h = m(h)
+	}
+	return h
 }

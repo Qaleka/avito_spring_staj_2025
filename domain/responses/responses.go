@@ -1,6 +1,9 @@
 package responses
 
-import "time"
+import (
+	"avito_spring_staj_2025/domain/models"
+	"time"
+)
 
 type RegisterResponse struct {
 	Id    string `json:"id"`
@@ -33,4 +36,14 @@ type CloseReceptionResponse struct {
 	DateTime time.Time `json:"dateTime"`
 	PvzId    string    `json:"pvzId"`
 	Status   string    `json:"status"`
+}
+
+type GetPvzsInformationResponse struct {
+	Pvz        models.Pvz                 `json:"pvz"`
+	Receptions []GetReceptionWithProducts `json:"receptions"`
+}
+
+type GetReceptionWithProducts struct {
+	Reception models.Reception `json:"reception"`
+	Products  []models.Product `json:"products"`
 }

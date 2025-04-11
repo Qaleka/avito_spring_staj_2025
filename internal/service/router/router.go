@@ -4,8 +4,10 @@ import (
 	auth "avito_spring_staj_2025/internal/auth/controller"
 	pvz "avito_spring_staj_2025/internal/pvz/controller"
 	"avito_spring_staj_2025/internal/service/jwt"
+	"avito_spring_staj_2025/internal/service/metrics"
 	"avito_spring_staj_2025/internal/service/middleware"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 )
 
@@ -13,17 +15,24 @@ func SetUpRoutes(authHandler *auth.AuthHandler, pvzHandler *pvz.PvzHandler, jwtS
 	router := mux.NewRouter()
 	api := "/api"
 
-	router.HandleFunc(api+"/dummyLogin", authHandler.DummyLogin).Methods("POST")
-	router.HandleFunc(api+"/register", authHandler.Register).Methods("POST")
-	router.HandleFunc(api+"/login", authHandler.Login).Methods("POST")
-	router.Handle(api+"/pvz", middleware.RoleMiddleware(jwtService)(http.HandlerFunc(pvzHandler.CreatePvz))).Methods("POST")
-	router.Handle(api+"/receptions", middleware.RoleMiddleware(jwtService)(http.HandlerFunc(pvzHandler.CreateReception))).Methods("POST")
-	router.Handle(api+"/products", middleware.RoleMiddleware(jwtService)(http.HandlerFunc(pvzHandler.AddProductToReception))).Methods("POST")
-	router.Handle(api+"/pvz/{pvzId}/delete_last_product", middleware.RoleMiddleware(jwtService)(http.HandlerFunc(pvzHandler.DeleteLastProduct))).Methods("POST")
-	router.Handle(api+"/pvz/{pvzId}/close_last_reception", middleware.RoleMiddleware(jwtService)(http.HandlerFunc(pvzHandler.CloseLastReception))).Methods("POST")
-	//router.HandleFunc(api+"/pvz/{pvzId}/close_last_reception", pvzHandler.CloseLastReception).Methods("POST")
-	//router.HandleFunc(api+"/pvz/{pvzId}/delete_last_product", pvzHandler.DeleteLastProduct).Methods("POST")
-	//router.HandleFunc(api+"/receptions", pvzHandler.CreateReceptions).Methods("POST")
-	//router.HandleFunc(api+"/products", pvzHandler.AddProduct).Methods("POST")
+	withLogging := middleware.WithLoggingAndMetrics
+	withAuth := middleware.RoleMiddleware(jwtService)
+
+	withCreatedPvzMetric := middleware.WithCustomMetric(metrics.AmountOfCreatedPvz)
+	withCreatedReceptionMetric := middleware.WithCustomMetric(metrics.AmountOfCreatedReceptions)
+	withAddedProductMetric := middleware.WithCustomMetric(metrics.AmountOfAddedProducts)
+
+	router.Handle(api+"/dummyLogin", middleware.ChainMiddlewares(http.HandlerFunc(authHandler.DummyLogin), withLogging)).Methods("POST")
+	router.Handle(api+"/register", middleware.ChainMiddlewares(http.HandlerFunc(authHandler.Register), withLogging)).Methods("POST")
+	router.Handle(api+"/login", middleware.ChainMiddlewares(http.HandlerFunc(authHandler.Login), withLogging)).Methods("POST")
+
+	router.Handle(api+"/pvz", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.CreatePvz), withLogging, withAuth, withCreatedPvzMetric)).Methods("POST")
+	router.Handle(api+"/receptions", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.CreateReception), withLogging, withAuth, withCreatedReceptionMetric)).Methods("POST")
+	router.Handle(api+"/products", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.AddProductToReception), withLogging, withAuth, withAddedProductMetric)).Methods("POST")
+	router.Handle(api+"/pvz/{pvzId}/delete_last_product", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.DeleteLastProduct), withLogging, withAuth)).Methods("POST")
+	router.Handle(api+"/pvz/{pvzId}/close_last_reception", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.CloseLastReception), withLogging, withAuth)).Methods("POST")
+	router.Handle(api+"/pvz", middleware.ChainMiddlewares(http.HandlerFunc(pvzHandler.GetPvzsInformation), withLogging, withAuth)).Methods("GET")
+	router.Handle(api+"/metrics", promhttp.Handler())
+
 	return router
 }

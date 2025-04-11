@@ -10,6 +10,7 @@ import (
 	"errors"
 	sq "github.com/Masterminds/squirrel"
 	"go.uber.org/zap"
+	"time"
 )
 
 type pvzRepository struct {
@@ -101,7 +102,7 @@ func (r *pvzRepository) GetPvzById(ctx context.Context, pvzId string) (*models.P
 			)
 			return nil, errors.New("pvz not found")
 		}
-		logger.DBLogger.Error("failed to scan user", zap.Error(err))
+		logger.DBLogger.Error("failed to scan user", zap.Error(err), zap.String("query", query))
 		return nil, err
 	}
 
@@ -113,7 +114,7 @@ func (r *pvzRepository) GetCurrentReception(ctx context.Context, pvzId string) (
 	logger.DBLogger.Info("GetCurrentReception called", zap.String("request_id", requestID), zap.String("pvz_id", pvzId))
 	queryBuilder := sq.Select("id", "date_time", "pvz_id", "status").
 		From("receptions").
-		Where(sq.Eq{"id": pvzId}).
+		Where(sq.Eq{"pvz_id": pvzId}).
 		Where(sq.Eq{"status": models.STATUS_ACTIVE}).
 		PlaceholderFormat(sq.Dollar)
 
@@ -197,7 +198,7 @@ func (r *pvzRepository) GetLastProductInReception(ctx context.Context, reception
 				zap.String("request_id", requestID),
 				zap.String("reception_id", receptionId),
 			)
-			return nil, nil
+			return nil, errors.New("no products in reception")
 		}
 		logger.DBLogger.Error("failed to scan product", zap.Error(err))
 		return nil, err
@@ -276,4 +277,121 @@ func (r *pvzRepository) CloseReception(ctx context.Context, reception *models.Re
 	)
 
 	return nil
+}
+
+func (r *pvzRepository) GetPvzsFilteredByReceptionDate(ctx context.Context, from, to time.Time, limit, offset int) ([]models.Pvz, error) {
+
+	queryBuilder := sq.
+		Select("id", "registration_date", "city").
+		From("pvzs").
+		PlaceholderFormat(sq.Dollar)
+
+	whereClauses := sq.And{}
+
+	if !from.IsZero() {
+		whereClauses = append(whereClauses, sq.GtOrEq{"registration_date": from})
+	}
+	if !to.IsZero() {
+		whereClauses = append(whereClauses, sq.LtOrEq{"registration_date": to})
+	}
+
+	if len(whereClauses) > 0 {
+		queryBuilder = queryBuilder.Where(whereClauses)
+	}
+
+	queryBuilder = queryBuilder.
+		Limit(uint64(limit)).
+		Offset(uint64(offset))
+
+	query, args, err := queryBuilder.ToSql()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pvzs []models.Pvz
+	for rows.Next() {
+		var p models.Pvz
+		if err := rows.Scan(&p.Id, &p.RegistrationDate, &p.City); err != nil {
+			return nil, err
+		}
+		pvzs = append(pvzs, p)
+	}
+
+	return pvzs, nil
+}
+
+func (r *pvzRepository) GetPvzReceptions(ctx context.Context, pvzId string) ([]models.Reception, error) {
+	requestID := middleware.GetRequestID(ctx)
+	logger.DBLogger.Info("GetPvzReceptions called",
+		zap.String("request_id", requestID),
+		zap.String("pvz_id", pvzId),
+	)
+
+	queryBuilder := sq.Select("id", "date_time", "pvz_id", "status").
+		From("receptions").
+		Where(sq.Eq{"pvz_id": pvzId}).
+		PlaceholderFormat(sq.Dollar)
+
+	query, args, err := queryBuilder.ToSql()
+	if err != nil {
+		logger.DBLogger.Error("failed to build GetPvzReceptions SQL", zap.Error(err))
+		return nil, err
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var receptions []models.Reception
+	for rows.Next() {
+		var r models.Reception
+		if err := rows.Scan(&r.Id, &r.DateTime, &r.PvzId, &r.Status); err != nil {
+			return nil, err
+		}
+		receptions = append(receptions, r)
+	}
+
+	return receptions, nil
+}
+
+func (r *pvzRepository) GetReceptionProducts(ctx context.Context, receptionId string) ([]models.Product, error) {
+	requestID := middleware.GetRequestID(ctx)
+	logger.DBLogger.Info("GetReceptionProducts called",
+		zap.String("request_id", requestID),
+		zap.String("reception_id", receptionId),
+	)
+
+	queryBuilder := sq.Select("id", "date_time", "type", "reception_id").
+		From("products").
+		Where(sq.Eq{"reception_id": receptionId}).
+		PlaceholderFormat(sq.Dollar)
+
+	query, args, err := queryBuilder.ToSql()
+	if err != nil {
+		logger.DBLogger.Error("failed to build GetReceptionProducts SQL", zap.Error(err))
+		return nil, err
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var p models.Product
+		if err := rows.Scan(&p.Id, &p.DateTime, &p.Type, &p.ReceptionId); err != nil {
+			return nil, err
+		}
+		products = append(products, p)
+	}
+
+	return products, nil
 }

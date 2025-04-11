@@ -6,10 +6,12 @@ import (
 	"avito_spring_staj_2025/internal/service/logger"
 	"avito_spring_staj_2025/internal/service/middleware"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/microcosm-cc/bluemonday"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -24,17 +26,10 @@ func NewPvzHandler(usecase usecase.PvzUsecase) *PvzHandler {
 }
 
 func (h *PvzHandler) CreatePvz(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	sanitizer := bluemonday.UGCPolicy()
 	defer cancel()
-
-	logger.AccessLogger.Info("Received SendCoins request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()),
-	)
 
 	var data requests.CreatePvzRequest
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -52,29 +47,21 @@ func (h *PvzHandler) CreatePvz(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed CreatePvz request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusCreated))
 }
 
 func (h *PvzHandler) CreateReception(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	sanitizer := bluemonday.UGCPolicy()
 	defer cancel()
-	logger.AccessLogger.Info("Received SendCoins request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()))
 
 	var data requests.CreateReceptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -82,37 +69,29 @@ func (h *PvzHandler) CreateReception(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data = requests.CreateReceptionRequest{
-		Id: sanitizer.Sanitize(data.Id),
+		PvzId: sanitizer.Sanitize(data.PvzId),
 	}
+
 	response, err := h.usecase.CreateReception(ctx, data)
 	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed CreateReception request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusCreated))
 }
 
 func (h *PvzHandler) AddProductToReception(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	sanitizer := bluemonday.UGCPolicy()
 	defer cancel()
-
-	logger.AccessLogger.Info("Received AddProductToReception request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()))
 
 	var data requests.AddProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -130,78 +109,105 @@ func (h *PvzHandler) AddProductToReception(w http.ResponseWriter, r *http.Reques
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed AddProductToReception request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusCreated))
-
 }
 
 func (h *PvzHandler) DeleteLastProduct(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 	requestID := middleware.GetRequestID(r.Context())
 	ctx, cancel := middleware.WithTimeout(r.Context())
 	sanitizer := bluemonday.UGCPolicy()
 	defer cancel()
 
-	logger.AccessLogger.Info("Received DeleteLastProduct request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()))
+	pvzId := sanitizer.Sanitize(mux.Vars(r)["pvzId"])
 
-	rpzId := sanitizer.Sanitize(mux.Vars(r)["rpzId"])
-
-	err := h.usecase.DeleteLastProduct(ctx, rpzId)
+	err := h.usecase.DeleteLastProduct(ctx, pvzId)
 	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+
 	w.WriteHeader(http.StatusOK)
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed DeleteLastProduct request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusOK))
 }
 
 func (h *PvzHandler) CloseLastReception(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	requestID := middleware.GetRequestID(r.Context())
-	ctx, cancel := middleware.WithTimeout(r.Context())
+	ctx := r.Context()
+	requestID := middleware.GetRequestID(ctx)
 	sanitizer := bluemonday.UGCPolicy()
-	defer cancel()
 
-	logger.AccessLogger.Info("Received CloseReception request",
-		zap.String("request_id", requestID),
-		zap.String("method", r.Method),
-		zap.String("url", r.URL.String()))
+	pvzId := sanitizer.Sanitize(mux.Vars(r)["pvzId"])
 
-	rpzId := sanitizer.Sanitize(mux.Vars(r)["rpzId"])
-
-	response, err := h.usecase.CloseReception(ctx, rpzId)
+	response, err := h.usecase.CloseReception(ctx, pvzId)
 	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-	duration := time.Since(start)
-	logger.AccessLogger.Info("Completed CloseReception request",
-		zap.String("request_id", requestID),
-		zap.Duration("duration", duration),
-		zap.Int("status", http.StatusOK))
+}
+
+func (h *PvzHandler) GetPvzsInformation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	requestID := middleware.GetRequestID(ctx)
+	sanitizer := bluemonday.UGCPolicy()
+
+	queryParams := r.URL.Query()
+	startDateStr := sanitizer.Sanitize(queryParams.Get("startDate"))
+	endDateStr := sanitizer.Sanitize(queryParams.Get("endDate"))
+
+	var startDate, endDate time.Time
+	var err error
+
+	if startDateStr != "" {
+		startDate, err = time.Parse(time.RFC3339, startDateStr)
+		if err != nil {
+			h.handleError(w, fmt.Errorf("invalid startDate: %v", err), requestID)
+			return
+		}
+	}
+	if endDateStr != "" {
+		endDate, err = time.Parse(time.RFC3339, endDateStr)
+		if err != nil {
+			h.handleError(w, fmt.Errorf("invalid endDate: %v", err), requestID)
+			return
+		}
+	}
+
+	pageStr := sanitizer.Sanitize(queryParams.Get("page"))
+	limitStr := sanitizer.Sanitize(queryParams.Get("limit"))
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+
+	response, err := h.usecase.GetPvzsInformation(ctx, startDate, endDate, limit, page)
+	if err != nil {
+		h.handleError(w, err, requestID)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.handleError(w, err, requestID)
+		return
+	}
 }
 
 func (h *PvzHandler) handleError(w http.ResponseWriter, err error, requestID string) {

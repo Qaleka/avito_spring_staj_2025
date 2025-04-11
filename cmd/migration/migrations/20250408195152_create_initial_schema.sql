@@ -25,9 +25,9 @@ CREATE TABLE receptions (
 
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    received_at TIMESTAMP NOT NULL,
+    date_time TIMESTAMP NOT NULL,
     type TEXT CHECK (type IN ('электроника', 'одежда', 'обувь')) NOT NULL,
-    date_time UUID NOT NULL,
+    reception_id UUID NOT NULL,
     FOREIGN KEY (reception_id) REFERENCES receptions(id)
 );
 
