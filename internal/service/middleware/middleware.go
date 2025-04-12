@@ -22,10 +22,10 @@ const (
 	loggerKey contextKey = "logger"
 )
 
-const requestTimeout = 1000 * time.Second
+const RequestTimeout = 1000 * time.Second
 
 func WithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, requestTimeout)
+	return context.WithTimeout(ctx, RequestTimeout)
 }
 
 type key int

@@ -3,3 +3,5 @@
 .idea/vcs.xml
 access.log
 db.log
+cover
+cover.out

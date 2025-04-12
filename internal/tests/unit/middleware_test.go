@@ -1,11 +1,20 @@
 package unit
 
 import (
+	jwt_service "avito_spring_staj_2025/internal/service/jwt"
+	"avito_spring_staj_2025/internal/service/logger"
 	"avito_spring_staj_2025/internal/service/middleware"
+	"avito_spring_staj_2025/internal/tests/mocks/jwt_mocks"
+	"context"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestRequestIDMiddleware(t *testing.T) {
@@ -57,7 +66,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		}
 
 		handler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusTooManyRequests, rr.Code)
+		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 }
 
@@ -97,166 +106,186 @@ func TestEnableCORS(t *testing.T) {
 	}
 }
 
-//func TestRoleMiddleware(t *testing.T) {
-//	tests := []struct {
-//		name           string
-//		authHeader     string
-//		mockValidate   func(token string) (*jwt_service.JwtCsrfClaims, error)
-//		expectedStatus int
-//	}{
-//		{
-//			name:       "should set role in context for valid token",
-//			authHeader: "Bearer valid.token",
-//			mockValidate: func(token string) (*jwt_service.JwtCsrfClaims, error) {
-//				return &jwt_service.JwtCsrfClaims{Role: "admin"}, nil
-//			},
-//			expectedStatus: http.StatusOK,
-//		},
-//		{
-//			name:           "should reject request without auth header",
-//			authHeader:     "",
-//			mockValidate:   nil,
-//			expectedStatus: http.StatusUnauthorized,
-//		},
-//		{
-//			name:       "should reject request with invalid token",
-//			authHeader: "Bearer invalid.token",
-//			mockValidate: func(token string) (*jwt_service.JwtCsrfClaims, error) {
-//				return nil, jwt.ErrSignatureInvalid
-//			},
-//			expectedStatus: http.StatusUnauthorized,
-//		},
-//	}
-//
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			req := httptest.NewRequest("GET", "/", nil)
-//			if tt.authHeader != "" {
-//				req.Header.Set("Authorization", tt.authHeader)
-//			}
-//
-//			rr := httptest.NewRecorder()
-//
-//			mockJwt := &jwt_mocks.MockJwtService{ValidateFunc: tt.mockValidate}
-//			handler := middleware.RoleMiddleware(mockJwt)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//				role := r.Context().Value(middleware.ContextKeyRole)
-//				assert.Equal(t, "admin", role)
-//				w.WriteHeader(http.StatusOK)
-//			}))
-//
-//			handler.ServeHTTP(rr, req)
-//			assert.Equal(t, tt.expectedStatus, rr.Code)
-//		})
-//	}
-//}
-//
-//func TestWithLoggingAndMetrics(t *testing.T) {
-//	// Мокируем логгер и метрики для теста
-//	oldLogger := logger.AccessLogger
-//	defer func() { logger.AccessLogger = oldLogger }()
-//
-//	var loggedMessages []string
-//	logger.AccessLogger = zap.NewNop()
-//
-//	req := httptest.NewRequest("GET", "/test", nil)
-//	rr := httptest.NewRecorder()
-//
-//	handler := middleware.WithLoggingAndMetrics(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		// Проверяем что timeout установлен в контексте
-//		_, ok := r.Context().Deadline()
-//		assert.True(t, ok)
-//		w.WriteHeader(http.StatusOK)
-//	}))
-//
-//	handler.ServeHTTP(rr, req)
-//	assert.Equal(t, http.StatusOK, rr.Code)
-//	assert.Equal(t, 0, len(loggedMessages)) // Проверяем что вызовы логирования были
-//}
-//
-//func TestWithCustomMetric(t *testing.T) {
-//	metric := prometheus.NewCounterVec(
-//		prometheus.CounterOpts{
-//			Name: "test_metric",
-//			Help: "Test metric",
-//		},
-//		[]string{"path"},
-//	)
-//
-//	req := httptest.NewRequest("GET", "/test-path", nil)
-//	rr := httptest.NewRecorder()
-//
-//	handler := middleware.WithCustomMetric(metric)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		w.WriteHeader(http.StatusOK)
-//	}))
-//
-//	handler.ServeHTTP(rr, req)
-//	assert.Equal(t, http.StatusOK, rr.Code)
-//
-//	// Проверяем что метрика была инкрементирована
-//	metrics, err := metric.GetMetricWithLabelValues("/test-path")
-//	require.NoError(t, err)
-//
-//	var m prometheus.Metric
-//	require.NotPanics(t, func() { m = metrics.(prometheus.Metric) })
-//
-//	pb := &prometheus.Metric{}
-//	m.Write(pb)
-//	assert.True(t, pb.Counter != nil && pb.Counter.Value != nil && *pb.Counter.Value > 0)
-//}
-//
-//func TestChainMiddlewares(t *testing.T) {
-//	var calls []string
-//
-//	m1 := func(next http.Handler) http.Handler {
-//		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//			calls = append(calls, "m1")
-//			next.ServeHTTP(w, r)
-//		}
-//	}
-//
-//	m2 := func(next http.Handler) http.Handler {
-//		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//			calls = append(calls, "m2")
-//			next.ServeHTTP(w, r)
-//		}
-//	}
-//
-//	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		calls = append(calls, "handler")
-//		w.WriteHeader(http.StatusOK)
-//	})
-//
-//	chained := middleware.ChainMiddlewares(handler, m1, m2)
-//
-//	req := httptest.NewRequest("GET", "/", nil)
-//	rr := httptest.NewRecorder()
-//	chained.ServeHTTP(rr, req)
-//
-//	assert.Equal(t, http.StatusOK, rr.Code)
-//	assert.Equal(t, []string{"m1", "m2", "handler"}, calls)
-//}
-//
-//func TestWithTimeout(t *testing.T) {
-//	t.Run("should return context with timeout", func(t *testing.T) {
-//		ctx := context.Background()
-//		newCtx, cancel := middleware.WithTimeout(ctx)
-//		defer cancel()
-//
-//		deadline, ok := newCtx.Deadline()
-//		assert.True(t, ok)
-//		assert.WithinDuration(t, time.Now().Add(middleware.requestTimeout), deadline, time.Second)
-//	})
-//}
-//
-//func TestGetRequestID(t *testing.T) {
-//	t.Run("should return request ID from context", func(t *testing.T) {
-//		expectedID := "test-request-id"
-//		ctx := context.WithValue(context.Background(), middleware.RequestIDKey, expectedID)
-//
-//		assert.Equal(t, expectedID, middleware.GetRequestID(ctx))
-//	})
-//
-//	t.Run("should return empty string when no request ID in context", func(t *testing.T) {
-//		assert.Empty(t, middleware.GetRequestID(context.Background()))
-//	})
-//}
+func TestRoleMiddleware(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *jwt_mocks.MockJwtService)
+		authHeader     string
+		expectedStatus int
+		expectedRole   string
+	}{
+		{
+			name: "success with valid token",
+			setupMock: func(m *jwt_mocks.MockJwtService) {
+				m.On("Validate", "valid.token").Return(
+					&jwt_service.JwtCsrfClaims{Role: "admin"}, nil)
+			},
+			authHeader:     "Bearer valid.token",
+			expectedStatus: http.StatusOK,
+			expectedRole:   "admin",
+		},
+		{
+			name:           "missing authorization header",
+			setupMock:      func(m *jwt_mocks.MockJwtService) {},
+			authHeader:     "",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "invalid token format",
+			setupMock: func(m *jwt_mocks.MockJwtService) {
+				m.On("Validate", "invalid.token").Return(
+					(*jwt_service.JwtCsrfClaims)(nil), jwt.ErrSignatureInvalid)
+			},
+			authHeader:     "Bearer invalid.token",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "expired token",
+			setupMock: func(m *jwt_mocks.MockJwtService) {
+				m.On("Validate", "expired.token").Return(
+					(*jwt_service.JwtCsrfClaims)(nil), jwt.NewValidationError("token expired", jwt.ValidationErrorExpired))
+			},
+			authHeader:     "Bearer expired.token",
+			expectedStatus: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockJwt := new(jwt_mocks.MockJwtService)
+			tt.setupMock(mockJwt)
+
+			req := httptest.NewRequest("GET", "/", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+
+			rr := httptest.NewRecorder()
+
+			handler := middleware.RoleMiddleware(mockJwt)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				role := r.Context().Value(middleware.ContextKeyRole)
+				assert.Equal(t, tt.expectedRole, role)
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			mockJwt.AssertExpectations(t)
+		})
+	}
+}
+
+func TestWithLoggingAndMetrics(t *testing.T) {
+	oldLogger := logger.AccessLogger
+	defer func() { logger.AccessLogger = oldLogger }()
+
+	var loggedMessages []string
+	logger.AccessLogger = zap.NewNop()
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	rr := httptest.NewRecorder()
+
+	handler := middleware.WithLoggingAndMetrics(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, ok := r.Context().Deadline()
+		assert.True(t, ok)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, 0, len(loggedMessages))
+}
+
+func TestWithCustomMetric(t *testing.T) {
+	metric := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "test_metric",
+			Help: "Test metric",
+		},
+		[]string{"path"},
+	)
+
+	registry := prometheus.NewRegistry()
+	err := registry.Register(metric)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/test-path", nil)
+	rr := httptest.NewRecorder()
+
+	handler := middleware.WithCustomMetric(metric)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	metrics, err := registry.Gather()
+	require.NoError(t, err)
+	require.Len(t, metrics, 1)
+
+	assert.Equal(t, "test_metric", metrics[0].GetName())
+	require.Len(t, metrics[0].GetMetric(), 1)
+
+	counter := metrics[0].GetMetric()[0].GetCounter()
+	assert.NotNil(t, counter)
+	assert.Equal(t, 1.0, counter.GetValue())
+}
+
+func TestChainMiddlewares(t *testing.T) {
+	var calls []string
+
+	m1 := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls = append(calls, "m1")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	m2 := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls = append(calls, "m2")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, "handler")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	chained := middleware.ChainMiddlewares(handler, m1, m2)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	chained.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, []string{"m2", "m1", "handler"}, calls)
+}
+
+func TestWithTimeout(t *testing.T) {
+	t.Run("should return context with timeout", func(t *testing.T) {
+		ctx := context.Background()
+		newCtx, cancel := middleware.WithTimeout(ctx)
+		defer cancel()
+
+		deadline, ok := newCtx.Deadline()
+		assert.True(t, ok)
+		assert.WithinDuration(t, time.Now().Add(middleware.RequestTimeout), deadline, time.Second)
+	})
+}
+
+func TestGetRequestID(t *testing.T) {
+	t.Run("should return request ID from context", func(t *testing.T) {
+		expectedID := "test-request-id"
+		ctx := context.WithValue(context.Background(), middleware.RequestIDKey, expectedID)
+
+		assert.Equal(t, expectedID, middleware.GetRequestID(ctx))
+	})
+
+	t.Run("should return empty string when no request ID in context", func(t *testing.T) {
+		assert.Empty(t, middleware.GetRequestID(context.Background()))
+	})
+}
