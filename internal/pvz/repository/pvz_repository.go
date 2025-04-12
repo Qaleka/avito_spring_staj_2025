@@ -269,7 +269,7 @@ func (r *pvzRepository) CloseReception(ctx context.Context, reception *models.Re
 		return err
 	}
 
-	reception.Status = "closed"
+	reception.Status = "close"
 
 	logger.DBLogger.Info("Reception successfully closed",
 		zap.String("request_id", requestID),

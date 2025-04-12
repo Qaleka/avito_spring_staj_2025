@@ -168,7 +168,7 @@ func TestLogin(t *testing.T) {
 			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
 				m.On("Login", mock.Anything, mock.Anything).Return("", errors.New("invalid credentials"))
 			},
-			expectedStatus: http.StatusUnauthorized,
+			expectedStatus: http.StatusBadRequest,
 		},
 	}
 

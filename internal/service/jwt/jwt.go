@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
 	"time"
@@ -17,6 +18,9 @@ type JwtToken struct {
 }
 
 func NewJwtToken(secret string) (JwtTokenService, error) {
+	if secret == "" {
+		return nil, errors.New("secret key can't be empty")
+	}
 	return &JwtToken{
 		Secret: []byte(secret),
 	}, nil
@@ -28,6 +32,9 @@ type JwtCsrfClaims struct {
 }
 
 func (tk *JwtToken) Create(role string, tokenExpTime int64) (string, error) {
+	if role == "" {
+		return "", errors.New("role is empty")
+	}
 	data := JwtCsrfClaims{
 		Role: role,
 		StandardClaims: jwt.StandardClaims{
@@ -50,11 +57,10 @@ func (tk *JwtToken) Validate(tokenString string) (*JwtCsrfClaims, error) {
 		return nil, fmt.Errorf("invalid token")
 	}
 
-	// Проверка срока действия (дополнительно)
 	if claims.ExpiresAt < time.Now().Unix() {
 		return nil, fmt.Errorf("token has expired")
 	}
-	
+
 	return claims, nil
 }
 

@@ -17,14 +17,14 @@ func (m *MockPvzUsecase) CreatePvz(ctx context.Context, req *requests.CreatePvzR
 	return args.Error(0)
 }
 
-func (m *MockPvzUsecase) CreateReception(ctx context.Context, req requests.CreateReceptionRequest) (interface{}, error) {
+func (m *MockPvzUsecase) CreateReception(ctx context.Context, req requests.CreateReceptionRequest) (responses.CreateReceptionResponse, error) {
 	args := m.Called(ctx, req)
-	return args.Get(0), args.Error(1)
+	return args.Get(0).(responses.CreateReceptionResponse), args.Error(1)
 }
 
-func (m *MockPvzUsecase) AddProductToReception(ctx context.Context, req requests.AddProductRequest) (interface{}, error) {
+func (m *MockPvzUsecase) AddProductToReception(ctx context.Context, req requests.AddProductRequest) (responses.AddProductResponse, error) {
 	args := m.Called(ctx, req)
-	return args.Get(0), args.Error(1)
+	return args.Get(0).(responses.AddProductResponse), args.Error(1)
 }
 
 func (m *MockPvzUsecase) DeleteLastProduct(ctx context.Context, pvzID string) error {
@@ -32,14 +32,14 @@ func (m *MockPvzUsecase) DeleteLastProduct(ctx context.Context, pvzID string) er
 	return args.Error(0)
 }
 
-func (m *MockPvzUsecase) CloseReception(ctx context.Context, pvzID string) (interface{}, error) {
+func (m *MockPvzUsecase) CloseReception(ctx context.Context, pvzID string) (responses.CloseReceptionResponse, error) {
 	args := m.Called(ctx, pvzID)
-	return args.Get(0), args.Error(1)
+	return args.Get(0).(responses.CloseReceptionResponse), args.Error(1)
 }
 
-func (m *MockPvzUsecase) GetPvzsInformation(ctx context.Context, start, end time.Time, limit, page int) (interface{}, error) {
-	args := m.Called(ctx, start, end, limit, page)
-	return args.Get(0), args.Error(1)
+func (m *MockPvzUsecase) GetPvzsInformation(ctx context.Context, fromDate, endDate time.Time, limit, page int) ([]responses.GetPvzsInformationResponse, error) {
+	args := m.Called(ctx, fromDate, endDate, limit, page)
+	return args.Get(0).([]responses.GetPvzsInformationResponse), args.Error(1)
 }
 
 type AuthUsecaseMock struct {
