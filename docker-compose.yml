@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgresDatabase
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    command: ["postgres", "-c", "max_connections=1000"]
+
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrator
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+    networks:
+      - app-network
+
+  adminer:
+    image: adminer:latest
+    container_name: adminerr
+    depends_on:
+      - postgres
+    ports:
+      - "8008:8080"
+    networks:
+      - app-network
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.webapp
+    depends_on:
+      - postgres
+      - migrator
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      BACKEND_URL: ${BACKEND_URL}
+      GRPC_URL: ${GRPC_URL}
+    ports:
+      - "8080:8080"
+      - "3000:3000"
+    networks:
+      - app-network
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9000:9090"
+    networks:
+      - app-network
+    depends_on:
+      - webapp
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

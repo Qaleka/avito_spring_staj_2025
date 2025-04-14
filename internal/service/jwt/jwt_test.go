@@ -1,7 +1,6 @@
-package unit
+package jwt
 
 import (
-	jwt_service "avito_spring_staj_2025/internal/service/jwt"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,7 +10,7 @@ import (
 
 func TestJwtToken_CreateAndValidate(t *testing.T) {
 	secret := "test-secret"
-	service, err := jwt_service.NewJwtToken(secret)
+	service, err := NewJwtToken(secret)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -81,7 +80,7 @@ func TestJwtToken_CreateAndValidate(t *testing.T) {
 
 func TestJwtToken_ValidateInvalidTokens(t *testing.T) {
 	secret := "test-secret"
-	service, err := jwt_service.NewJwtToken(secret)
+	service, err := NewJwtToken(secret)
 	require.NoError(t, err)
 
 	validToken, err := service.Create("admin", time.Now().Add(1*time.Hour).Unix())
@@ -119,13 +118,13 @@ func TestJwtToken_ValidateInvalidTokens(t *testing.T) {
 		},
 	}
 
-	wrongSecretService, err := jwt_service.NewJwtToken("wrong-secret")
+	wrongSecretService, err := NewJwtToken("wrong-secret")
 	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var err error
-			var claims *jwt_service.JwtCsrfClaims
+			var claims *JwtCsrfClaims
 
 			if tt.name == "Valid token but wrong secret" {
 				claims, err = wrongSecretService.Validate(tt.token)
@@ -147,7 +146,7 @@ func TestJwtToken_ValidateInvalidTokens(t *testing.T) {
 
 func TestJwtToken_ParseSecretGetter(t *testing.T) {
 	secret := "test-secret"
-	service, err := jwt_service.NewJwtToken(secret)
+	service, err := NewJwtToken(secret)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -183,7 +182,7 @@ func TestJwtToken_ParseSecretGetter(t *testing.T) {
 				assert.Nil(t, key)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, service.(*jwt_service.JwtToken).Secret, key)
+				assert.Equal(t, service.Secret, key)
 			}
 		})
 	}
@@ -209,7 +208,7 @@ func TestNewJwtToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := jwt_service.NewJwtToken(tt.secret)
+			_, err := NewJwtToken(tt.secret)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

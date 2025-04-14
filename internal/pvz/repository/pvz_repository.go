@@ -7,23 +7,23 @@ import (
 	"avito_spring_staj_2025/internal/service/middleware"
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
 	sq "github.com/Masterminds/squirrel"
 	"go.uber.org/zap"
 	"time"
 )
 
-type pvzRepository struct {
+type PvzRepository struct {
 	db *sql.DB
 }
 
 func NewPvzRepository(db *sql.DB) PvzRepository {
-	return &pvzRepository{
+	return PvzRepository{
 		db: db,
 	}
 }
 
-func (r *pvzRepository) CreatePvz(ctx context.Context, data *requests.CreatePvzRequest) error {
+func (r PvzRepository) CreatePvz(ctx context.Context, data *requests.CreatePvzRequest) error {
 	requestID := middleware.GetRequestID(ctx)
 	logger.DBLogger.Info("CreatePvz called", zap.String("request_id", requestID), zap.String("pvz_id", data.Id))
 	queryBuilder := sq.Insert("pvzs").
@@ -51,236 +51,11 @@ func (r *pvzRepository) CreatePvz(ctx context.Context, data *requests.CreatePvzR
 	return nil
 }
 
-func (r *pvzRepository) CreateReception(ctx context.Context, data models.Reception) error {
+func (r PvzRepository) GetPvzsFilteredByReceptionDate(ctx context.Context, from, to time.Time, limit, offset int) ([]models.Pvz, error) {
 	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("CreateReception called", zap.String("request_id", requestID))
-	queryBuilder := sq.Insert("receptions").
-		Columns("id", "date_time", "pvz_id", "status").
-		Values(data.Id, data.DateTime, data.PvzId, data.Status).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build SQL", zap.Error(err))
-		return err
-	}
-
-	_, err = r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		logger.DBLogger.Error("failed to insert reception", zap.Error(err))
-		return err
-	}
-	logger.DBLogger.Info("Reception successfully created",
-		zap.String("request_id", requestID))
-
-	return nil
-}
-
-func (r *pvzRepository) GetPvzById(ctx context.Context, pvzId string) (*models.Pvz, error) {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("GetPvzById called", zap.String("request_id", requestID), zap.String("pvz_id", pvzId))
-	queryBuilder := sq.Select("id", "registration_date", "city").
-		From("pvzs").
-		Where(sq.Eq{"id": pvzId}).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build SQL", zap.Error(err))
-		return nil, err
-	}
-
-	row := r.db.QueryRowContext(ctx, query, args...)
-
-	var pvz models.Pvz
-	err = row.Scan(&pvz.Id, &pvz.RegistrationDate, &pvz.City)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			logger.DBLogger.Info("pvz not found",
-				zap.String("request_id", requestID),
-				zap.String("pvz_id", pvzId),
-			)
-			return nil, errors.New("pvz not found")
-		}
-		logger.DBLogger.Error("failed to scan user", zap.Error(err), zap.String("query", query))
-		return nil, err
-	}
-
-	return &pvz, nil
-}
-
-func (r *pvzRepository) GetCurrentReception(ctx context.Context, pvzId string) (*models.Reception, error) {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("GetCurrentReception called", zap.String("request_id", requestID), zap.String("pvz_id", pvzId))
-	queryBuilder := sq.Select("id", "date_time", "pvz_id", "status").
-		From("receptions").
-		Where(sq.Eq{"pvz_id": pvzId}).
-		Where(sq.Eq{"status": models.STATUS_ACTIVE}).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build SQL", zap.Error(err))
-		return nil, err
-	}
-
-	row := r.db.QueryRowContext(ctx, query, args...)
-	var reception models.Reception
-
-	err = row.Scan(&reception.Id, &reception.DateTime, &reception.PvzId, &reception.Status)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			logger.DBLogger.Info("reception not found",
-				zap.String("request_id", requestID),
-				zap.String("pvz_id", pvzId))
-		}
-		return nil, errors.New("no active reception")
-	}
-	return &reception, nil
-}
-
-func (r *pvzRepository) AddProductToReception(ctx context.Context, product models.Product) error {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("AddProductToReception called", zap.String("request_id", requestID))
-	queryBuilder := sq.Insert("products").
-		Columns("id", "date_time", "type", "reception_id").
-		Values(product.Id, product.DateTime, product.Type, product.ReceptionId).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build SQL", zap.Error(err))
-		return err
-	}
-	_, err = r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		logger.DBLogger.Error("failed to insert product", zap.Error(err))
-		return err
-	}
-	logger.DBLogger.Info("Product successfully added",
+	logger.DBLogger.Info("GetPvzsFilteredByReceptionDate called",
 		zap.String("request_id", requestID),
-		zap.String("product_id", product.Id))
-
-	return nil
-}
-
-func (r *pvzRepository) GetLastProductInReception(ctx context.Context, receptionId string) (*models.Product, error) {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("GetLastProductInReception called",
-		zap.String("request_id", requestID),
-		zap.String("reception_id", receptionId),
 	)
-
-	queryBuilder := sq.
-		Select("id", "date_time", "type", "reception_id").
-		From("products").
-		Where(sq.Eq{"reception_id": receptionId}).
-		OrderBy("date_time DESC").
-		Limit(1).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build SQL", zap.Error(err))
-		return nil, err
-	}
-
-	var product models.Product
-	err = r.db.QueryRowContext(ctx, query, args...).Scan(
-		&product.Id,
-		&product.DateTime,
-		&product.Type,
-		&product.ReceptionId,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			logger.DBLogger.Info("no product found for reception",
-				zap.String("request_id", requestID),
-				zap.String("reception_id", receptionId),
-			)
-			return nil, errors.New("no products in reception")
-		}
-		logger.DBLogger.Error("failed to scan product", zap.Error(err))
-		return nil, err
-	}
-
-	return &product, nil
-}
-
-func (r *pvzRepository) DeleteProductById(ctx context.Context, productId string) error {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("DeleteProductByID called",
-		zap.String("request_id", requestID),
-		zap.String("product_id", productId),
-	)
-
-	queryBuilder := sq.
-		Delete("products").
-		Where(sq.Eq{"id": productId}).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build delete SQL", zap.Error(err))
-		return err
-	}
-
-	result, err := r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		logger.DBLogger.Error("failed to execute delete", zap.Error(err))
-		return err
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return errors.New("product not found or already deleted")
-	}
-
-	logger.DBLogger.Info("Product deleted successfully",
-		zap.String("request_id", requestID),
-		zap.String("product_id", productId),
-	)
-
-	return nil
-}
-
-func (r *pvzRepository) CloseReception(ctx context.Context, reception *models.Reception) error {
-	requestID := middleware.GetRequestID(ctx)
-	logger.DBLogger.Info("CloseReception called",
-		zap.String("request_id", requestID),
-		zap.String("reception_id", reception.Id),
-	)
-
-	queryBuilder := sq.
-		Update("receptions").
-		Set("status", models.STATUS_CLOSED).
-		Where(sq.Eq{"id": reception.Id}).
-		PlaceholderFormat(sq.Dollar)
-
-	query, args, err := queryBuilder.ToSql()
-	if err != nil {
-		logger.DBLogger.Error("failed to build update SQL", zap.Error(err))
-		return err
-	}
-
-	_, err = r.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		logger.DBLogger.Error("failed to update reception status", zap.Error(err))
-		return err
-	}
-
-	reception.Status = "close"
-
-	logger.DBLogger.Info("Reception successfully closed",
-		zap.String("request_id", requestID),
-		zap.String("reception_id", reception.Id),
-	)
-
-	return nil
-}
-
-func (r *pvzRepository) GetPvzsFilteredByReceptionDate(ctx context.Context, from, to time.Time, limit, offset int) ([]models.Pvz, error) {
-
 	queryBuilder := sq.
 		Select("id", "registration_date", "city").
 		From("pvzs").
@@ -311,7 +86,11 @@ func (r *pvzRepository) GetPvzsFilteredByReceptionDate(ctx context.Context, from
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.DBLogger.Error("failed to close rows", zap.Error(err))
+		}
+	}()
 
 	var pvzs []models.Pvz
 	for rows.Next() {
@@ -325,7 +104,7 @@ func (r *pvzRepository) GetPvzsFilteredByReceptionDate(ctx context.Context, from
 	return pvzs, nil
 }
 
-func (r *pvzRepository) GetPvzReceptions(ctx context.Context, pvzId string) ([]models.Reception, error) {
+func (r PvzRepository) GetPvzReceptions(ctx context.Context, pvzId string) ([]models.Reception, error) {
 	requestID := middleware.GetRequestID(ctx)
 	logger.DBLogger.Info("GetPvzReceptions called",
 		zap.String("request_id", requestID),
@@ -346,7 +125,11 @@ func (r *pvzRepository) GetPvzReceptions(ctx context.Context, pvzId string) ([]m
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.DBLogger.Error("failed to close rows", zap.Error(err))
+		}
+	}()
 
 	var receptions []models.Reception
 	for rows.Next() {
@@ -360,7 +143,7 @@ func (r *pvzRepository) GetPvzReceptions(ctx context.Context, pvzId string) ([]m
 	return receptions, nil
 }
 
-func (r *pvzRepository) GetReceptionProducts(ctx context.Context, receptionId string) ([]models.Product, error) {
+func (r PvzRepository) GetReceptionProducts(ctx context.Context, receptionId string) ([]models.Product, error) {
 	requestID := middleware.GetRequestID(ctx)
 	logger.DBLogger.Info("GetReceptionProducts called",
 		zap.String("request_id", requestID),
@@ -382,7 +165,11 @@ func (r *pvzRepository) GetReceptionProducts(ctx context.Context, receptionId st
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.DBLogger.Error("failed to close rows", zap.Error(err))
+		}
+	}()
 
 	var products []models.Product
 	for rows.Next() {
@@ -394,4 +181,32 @@ func (r *pvzRepository) GetReceptionProducts(ctx context.Context, receptionId st
 	}
 
 	return products, nil
+}
+
+func (r PvzRepository) GetAllPvzs(ctx context.Context) ([]models.Pvz, error) {
+	query := "SELECT id, registration_date, city FROM pvzs"
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query pvzs: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.DBLogger.Error("failed to close rows", zap.Error(err))
+		}
+	}()
+
+	var pvzs []models.Pvz
+	for rows.Next() {
+		var pvz models.Pvz
+		if err := rows.Scan(&pvz.Id, &pvz.RegistrationDate, &pvz.City); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		pvzs = append(pvzs, pvz)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate rows: %w", err)
+	}
+
+	return pvzs, nil
 }

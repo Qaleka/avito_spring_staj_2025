@@ -1,8 +1,7 @@
-package unit
+package repository
 
 import (
 	"avito_spring_staj_2025/domain/models"
-	"avito_spring_staj_2025/internal/auth/repository"
 	"avito_spring_staj_2025/internal/service/logger"
 	"avito_spring_staj_2025/internal/service/middleware"
 	"context"
@@ -61,9 +60,14 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() {
+				err := db.Close()
+				if err != nil {
+					return
+				}
+			}()
 
-			repo := repository.NewAuthRepository(db)
+			repo := NewAuthRepository(db)
 			tt.mock(mock)
 
 			err = repo.CreateUser(ctx, tt.user)
@@ -136,9 +140,14 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() {
+				err := db.Close()
+				if err != nil {
+					return
+				}
+			}()
 
-			repo := repository.NewAuthRepository(db)
+			repo := NewAuthRepository(db)
 			tt.mock(mock)
 
 			user, err := repo.GetUserByEmail(ctx, tt.email)

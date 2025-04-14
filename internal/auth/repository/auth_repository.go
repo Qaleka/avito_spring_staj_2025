@@ -11,17 +11,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type authRepository struct {
+type AuthRepository struct {
 	db *sql.DB
 }
 
 func NewAuthRepository(db *sql.DB) AuthRepository {
-	return &authRepository{
+	return AuthRepository{
 		db: db,
 	}
 }
 
-func (r *authRepository) CreateUser(ctx context.Context, user *models.User) error {
+func (r AuthRepository) CreateUser(ctx context.Context, user *models.User) error {
 	requestID := middleware.GetRequestID(ctx)
 	logger.DBLogger.Info("AuthUser called", zap.String("request_id", requestID), zap.String("username", user.Email))
 	queryBuilder := sq.Insert("users").
@@ -49,7 +49,7 @@ func (r *authRepository) CreateUser(ctx context.Context, user *models.User) erro
 	return nil
 }
 
-func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r AuthRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	requestID := middleware.GetRequestID(ctx)
 	logger.DBLogger.Info("AuthUser called", zap.String("request_id", requestID), zap.String("email", email))
 	queryBuilder := sq.Select("id", "email", "hash_password", "role").

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"avito_spring_staj_2025/internal/service/dsn"
+	"avito_spring_staj_2025/internal/db"
 	"database/sql"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -12,7 +12,7 @@ import (
 
 func main() {
 	_ = godotenv.Load()
-	databaseURL := dsn.FromEnv()
+	databaseURL := db.FromEnv()
 	if databaseURL == "" {
 		log.Fatal("DSN not provided. Please set DB_HOST and other DB_* env variables.")
 	}
@@ -21,7 +21,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open DB: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		err := db.Close()
+		if err != nil {
+			return
+		}
+	}()
 
 	migrationsDir := filepath.Join("cmd", "migration", "migrations")
 

@@ -1,8 +1,8 @@
-package controller
+package handler
 
 import (
 	"avito_spring_staj_2025/domain/requests"
-	"avito_spring_staj_2025/internal/auth/usecase"
+	"avito_spring_staj_2025/domain/responses"
 	"avito_spring_staj_2025/internal/service/logger"
 	"avito_spring_staj_2025/internal/service/middleware"
 	"encoding/json"
@@ -13,10 +13,10 @@ import (
 )
 
 type AuthHandler struct {
-	usecase usecase.AuthUsecase
+	usecase AuthUsecase
 }
 
-func NewAuthHandler(usecase usecase.AuthUsecase) *AuthHandler {
+func NewAuthHandler(usecase AuthUsecase) *AuthHandler {
 	return &AuthHandler{
 		usecase: usecase,
 	}
@@ -77,12 +77,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Role:     sanitizer.Sanitize(credentials.Role),
 	}
 
-	response, err := h.usecase.Register(ctx, credentials)
+	user, err := h.usecase.Register(ctx, credentials)
 	if err != nil {
 		h.handleError(w, err, requestID)
 		return
 	}
-
+	response := responses.RegisterResponse{
+		Id:    user.Id,
+		Email: user.Email,
+		Role:  user.Role,
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(response)

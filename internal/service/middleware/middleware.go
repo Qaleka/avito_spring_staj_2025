@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"avito_spring_staj_2025/internal/service/jwt"
 	"avito_spring_staj_2025/internal/service/logger"
 	"avito_spring_staj_2025/internal/service/metrics"
 	"context"
@@ -17,10 +16,6 @@ import (
 )
 
 type contextKey string
-
-const (
-	loggerKey contextKey = "logger"
-)
 
 const RequestTimeout = 1000 * time.Second
 
@@ -49,8 +44,8 @@ func GetRequestID(ctx context.Context) string {
 }
 
 const (
-	requestsPerSecond = 10000 // Лимит запросов в секунду для каждого IP
-	BurstLimit        = 10000 // Максимальный «всплеск» запросов
+	requestsPerSecond = 1000 // Лимит запросов в секунду для каждого IP
+	BurstLimit        = 1000 // Максимальный «всплеск» запросов
 )
 
 var clientLimiters = sync.Map{}
@@ -96,10 +91,9 @@ func EnableCORS(next http.Handler) http.Handler {
 
 const (
 	ContextKeyRole contextKey = "role"
-	ContextKeyUser contextKey = "user"
 )
 
-func RoleMiddleware(jwtService jwt.JwtTokenService) func(http.Handler) http.Handler {
+func RoleMiddleware(jwtService JwtTokenService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")

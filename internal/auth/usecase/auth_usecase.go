@@ -3,29 +3,26 @@ package usecase
 import (
 	"avito_spring_staj_2025/domain/models"
 	"avito_spring_staj_2025/domain/requests"
-	"avito_spring_staj_2025/domain/responses"
-	"avito_spring_staj_2025/internal/auth/repository"
 	"avito_spring_staj_2025/internal/service/auth"
-	"avito_spring_staj_2025/internal/service/jwt"
 	"context"
 	"errors"
 	"github.com/google/uuid"
 	"time"
 )
 
-type authUsecase struct {
-	authRepository repository.AuthRepository
-	jwtService     jwt.JwtTokenService
+type AuthUsecase struct {
+	authRepository AuthRepository
+	jwtService     JwtTokenService
 }
 
-func NewAuthUsecase(authRepository repository.AuthRepository, jwtService jwt.JwtTokenService) AuthUsecase {
-	return &authUsecase{
+func NewAuthUsecase(authRepository AuthRepository, jwtService JwtTokenService) AuthUsecase {
+	return AuthUsecase{
 		authRepository: authRepository,
 		jwtService:     jwtService,
 	}
 }
 
-func (au *authUsecase) DummyLogin(ctx context.Context, role string) (string, error) {
+func (au AuthUsecase) DummyLogin(_ context.Context, role string) (string, error) {
 	if role != "employee" && role != "moderator" {
 		return "", errors.New("invalid role")
 	}
@@ -37,30 +34,30 @@ func (au *authUsecase) DummyLogin(ctx context.Context, role string) (string, err
 	return jwtToken, nil
 }
 
-func (au *authUsecase) Register(ctx context.Context, credentials requests.RegisterRequest) (responses.RegisterResponse, error) {
+func (au AuthUsecase) Register(ctx context.Context, credentials requests.RegisterRequest) (models.User, error) {
 	hashedPassword, err := auth.HashPassword(credentials.Password)
 	if err != nil {
-		return responses.RegisterResponse{}, err
+		return models.User{}, err
 	}
 
 	if credentials.Role != "employee" && credentials.Role != "moderator" {
-		return responses.RegisterResponse{}, errors.New("invalid role")
+		return models.User{}, errors.New("invalid role")
 	}
 
 	_, err = au.authRepository.GetUserByEmail(ctx, credentials.Email)
 	if err == nil {
-		return responses.RegisterResponse{}, errors.New("user with this email already exists")
+		return models.User{}, errors.New("user with this email already exists")
 	}
 
 	user := models.User{Id: uuid.New().String(), Email: credentials.Email, Password: hashedPassword, Role: credentials.Role}
 	err = au.authRepository.CreateUser(ctx, &user)
 	if err != nil {
-		return responses.RegisterResponse{}, err
+		return models.User{}, err
 	}
-	return responses.RegisterResponse{Id: user.Id, Email: user.Email, Role: user.Role}, nil
+	return user, nil
 }
 
-func (au *authUsecase) Login(ctx context.Context, credentials requests.LoginRequest) (string, error) {
+func (au AuthUsecase) Login(ctx context.Context, credentials requests.LoginRequest) (string, error) {
 	user, err := au.authRepository.GetUserByEmail(ctx, credentials.Email)
 	if err != nil {
 		return "", err

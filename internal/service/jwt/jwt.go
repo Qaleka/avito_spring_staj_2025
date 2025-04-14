@@ -7,21 +7,15 @@ import (
 	"time"
 )
 
-type JwtTokenService interface {
-	Create(role string, tokenExpTime int64) (string, error)
-	Validate(tokenString string) (*JwtCsrfClaims, error)
-	ParseSecretGetter(token *jwt.Token) (interface{}, error)
-}
-
 type JwtToken struct {
 	Secret []byte
 }
 
-func NewJwtToken(secret string) (JwtTokenService, error) {
+func NewJwtToken(secret string) (JwtToken, error) {
 	if secret == "" {
-		return nil, errors.New("secret key can't be empty")
+		return JwtToken{}, errors.New("secret key can't be empty")
 	}
-	return &JwtToken{
+	return JwtToken{
 		Secret: []byte(secret),
 	}, nil
 }
@@ -31,7 +25,7 @@ type JwtCsrfClaims struct {
 	jwt.StandardClaims
 }
 
-func (tk *JwtToken) Create(role string, tokenExpTime int64) (string, error) {
+func (tk JwtToken) Create(role string, tokenExpTime int64) (string, error) {
 	if role == "" {
 		return "", errors.New("role is empty")
 	}
@@ -46,7 +40,7 @@ func (tk *JwtToken) Create(role string, tokenExpTime int64) (string, error) {
 	return token.SignedString(tk.Secret)
 }
 
-func (tk *JwtToken) Validate(tokenString string) (*JwtCsrfClaims, error) {
+func (tk JwtToken) Validate(tokenString string) (*JwtCsrfClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JwtCsrfClaims{}, tk.ParseSecretGetter)
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)
@@ -64,7 +58,7 @@ func (tk *JwtToken) Validate(tokenString string) (*JwtCsrfClaims, error) {
 	return claims, nil
 }
 
-func (tk *JwtToken) ParseSecretGetter(token *jwt.Token) (interface{}, error) {
+func (tk JwtToken) ParseSecretGetter(token *jwt.Token) (interface{}, error) {
 	method, ok := token.Method.(*jwt.SigningMethodHMAC)
 	if !ok || method.Alg() != "HS256" {
 		return nil, fmt.Errorf("bad sign method")

@@ -1,10 +1,9 @@
-package unit
+package handler
 
 import (
-	"avito_spring_staj_2025/domain/responses"
-	"avito_spring_staj_2025/internal/auth/controller"
+	"avito_spring_staj_2025/domain/models"
 	"avito_spring_staj_2025/internal/service/logger"
-	"avito_spring_staj_2025/internal/tests/mocks/usecase_mocks"
+	usecaseMocks "avito_spring_staj_2025/internal/tests/mocks/usecase_mocks"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,13 +19,13 @@ func TestDummyLogin(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
-		mockSetup      func(m *usecase_mocks.AuthUsecaseMock)
+		mockSetup      func(m *usecaseMocks.AuthUsecaseMock)
 		expectedStatus int
 	}{
 		{
 			name: "success",
 			body: `{"role": "employee"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
 				m.On("DummyLogin", mock.Anything, "employee").
 					Return("token", nil)
 			},
@@ -35,14 +34,14 @@ func TestDummyLogin(t *testing.T) {
 		{
 			name: "invalid body",
 			body: `{invalid-json`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(_ *usecaseMocks.AuthUsecaseMock) {
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
 		{
 			name: "service error",
 			body: `{"role": "aboba"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
 				m.On("DummyLogin", mock.Anything, "aboba").
 					Return("", errors.New("unauthorized"))
 			},
@@ -52,11 +51,11 @@ func TestDummyLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockUsecase := new(usecase_mocks.AuthUsecaseMock)
+			mockUsecase := new(usecaseMocks.AuthUsecaseMock)
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockUsecase)
 			}
-			handler := controller.NewAuthHandler(mockUsecase)
+			handler := NewAuthHandler(mockUsecase)
 
 			req := httptest.NewRequest(http.MethodPost, "/api/dummyLogin", strings.NewReader(tt.body))
 			w := httptest.NewRecorder()
@@ -75,15 +74,15 @@ func TestRegister(t *testing.T) {
 		name           string
 		body           string
 		headers        map[string]string
-		mockSetup      func(m *usecase_mocks.AuthUsecaseMock)
+		mockSetup      func(m *usecaseMocks.AuthUsecaseMock)
 		expectedStatus int
 	}{
 		{
 			name: "success",
 			body: `{"email":"test@example.com","password":"123456","role":"employee"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
 				m.On("Register", mock.Anything, mock.Anything).
-					Return(responses.RegisterResponse{Id: "1", Email: "test@example.com", Role: "employee"}, nil)
+					Return(models.User{Id: "1", Email: "test@example.com", Role: "employee"}, nil)
 			},
 			expectedStatus: http.StatusCreated,
 		},
@@ -103,8 +102,8 @@ func TestRegister(t *testing.T) {
 		{
 			name: "usecase error",
 			body: `{"email":"e","password":"p","role":"r"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
-				m.On("Register", mock.Anything, mock.Anything).Return(responses.RegisterResponse{}, errors.New("err"))
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
+				m.On("Register", mock.Anything, mock.Anything).Return(models.User{}, errors.New("err"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -112,11 +111,11 @@ func TestRegister(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockUsecase := new(usecase_mocks.AuthUsecaseMock)
+			mockUsecase := new(usecaseMocks.AuthUsecaseMock)
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockUsecase)
 			}
-			handler := controller.NewAuthHandler(mockUsecase)
+			handler := NewAuthHandler(mockUsecase)
 
 			req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(tt.body))
 			w := httptest.NewRecorder()
@@ -138,13 +137,13 @@ func TestLogin(t *testing.T) {
 		name           string
 		body           string
 		headers        map[string]string
-		mockSetup      func(m *usecase_mocks.AuthUsecaseMock)
+		mockSetup      func(m *usecaseMocks.AuthUsecaseMock)
 		expectedStatus int
 	}{
 		{
 			name: "success",
 			body: `{"email":"test@example.com","password":"123456"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
 				m.On("Login", mock.Anything, mock.Anything).Return("token", nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -165,7 +164,7 @@ func TestLogin(t *testing.T) {
 		{
 			name: "usecase error",
 			body: `{"email":"e","password":"p"}`,
-			mockSetup: func(m *usecase_mocks.AuthUsecaseMock) {
+			mockSetup: func(m *usecaseMocks.AuthUsecaseMock) {
 				m.On("Login", mock.Anything, mock.Anything).Return("", errors.New("invalid credentials"))
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -174,11 +173,11 @@ func TestLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockUsecase := new(usecase_mocks.AuthUsecaseMock)
+			mockUsecase := new(usecaseMocks.AuthUsecaseMock)
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockUsecase)
 			}
-			handler := controller.NewAuthHandler(mockUsecase)
+			handler := NewAuthHandler(mockUsecase)
 
 			req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(tt.body))
 			for k, v := range tt.headers {

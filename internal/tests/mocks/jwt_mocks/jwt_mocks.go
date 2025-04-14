@@ -1,4 +1,4 @@
-package jwt_mocks
+package jwtMocks
 
 import (
 	jwtService "avito_spring_staj_2025/internal/service/jwt"

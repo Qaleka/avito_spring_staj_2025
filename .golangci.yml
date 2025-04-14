@@ -1,0 +1,37 @@
+linters-settings:
+  gocritic:
+    enabled-checks:
+      - 'rangeValCopy'
+  staticcheck:
+    checks: ["all"]
+  revive:
+    severity: warning
+    rules:
+      - name: unused-parameter
+        disabled: false
+      - name: var-naming
+        disabled: false
+
+linters:
+  disable-all: false
+  enable:
+    - govet
+    - staticcheck
+    - gofmt
+    - gocritic
+    - revive
+  disable:
+    - errcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go$
+      linters:
+        - gocyclo
+
+output:
+  print-issued-lines: true
+  print-linter-name: true

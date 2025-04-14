@@ -1,6 +1,4 @@
-.idea/avito_spring_staj_2025.iml
-.idea/modules.xml
-.idea/vcs.xml
+.idea
 access.log
 db.log
 cover

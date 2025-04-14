@@ -12,4 +12,5 @@ type Reception struct {
 	DateTime time.Time
 	PvzId    string
 	Status   string
+	Products []Product `json:"-"`
 }
