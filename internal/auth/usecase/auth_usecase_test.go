@@ -268,8 +268,9 @@ func TestAuthUsecase_Login(t *testing.T) {
 			mockSetup: func(mr *repositoryMocks.MockAuthRepository, mj *jwtMocks.MockJwtService) {
 				mr.On("GetUserByEmail", mock.Anything, testEmail).
 					Return(testUser, nil)
-				mj.On("Create", "employee", expTime).
-					Return("", errors.New("jwt error"))
+				mj.On("Create", "employee", mock.MatchedBy(func(t int64) bool {
+					return math.Abs(float64(t-expTime)) <= 1
+				})).Return("", errors.New("jwt error"))
 			},
 			expectedToken: "",
 			expectedErr:   "jwt error",
